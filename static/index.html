@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fork Yield</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:    #f9f9f7;
+    --surface:  #fcfcfb;
+    --ink:      #0b0b0b;
+    --ink-2:    #52514e;
+    --muted:    #898781;
+    --grid:     #e1e0d9;
+    --axis:     #c3c2b7;
+    --border:   rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --good:     #0ca30c;
+    --warning:  #fab219;
+    --critical: #d03b3b;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7;
+      --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--plane); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 16px 72px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); font-size: 13.5px; margin: 0; max-width: 62ch; }
+  .meta { color: var(--muted); font-size: 12.5px; text-align: right; }
+  button.theme {
+    background: var(--surface); color: var(--ink-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; font-size: 12.5px; cursor: pointer;
+  }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0 8px; }
+  @media (max-width: 880px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .tiles { grid-template-columns: 1fr; } }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px 15px; }
+  .tile .k { font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+  .tile .v { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .tile .n { font-size: 12.5px; color: var(--ink-2); }
+  .tile .n strong { font-weight: 600; color: var(--ink); }
+
+  section.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 18px 14px; margin-top: 12px; }
+  .card h2 { font-size: 15.5px; margin: 0 0 3px; letter-spacing: -0.005em; }
+  .card .why { font-size: 13px; color: var(--ink-2); margin: 0 0 14px; max-width: 74ch; }
+  .card .why em { font-style: normal; color: var(--ink); font-weight: 600; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
+  .swatch.box { height: 10px; width: 10px; border-radius: 2px; }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .gl { stroke: var(--grid); stroke-width: 1; }
+  .ax { stroke: var(--axis); stroke-width: 1; }
+  .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .lbl { fill: var(--ink-2); font-size: 11.5px; }
+  .dl  { font-size: 11.5px; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--grid); }
+  th { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 18px; }
+  tr > :last-child { padding-right: 0; }
+  tbody tr:last-child td { border-bottom: none; }
+  .pill { font-size: 11px; padding: 1.5px 7px; border-radius: 99px; border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap; }
+  .bad { color: var(--critical); font-weight: 600; }
+  .reason { color: var(--muted); font-size: 12px; }
+
+  details.tv { margin-top: 10px; }
+  details.tv summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+  details.tv[open] summary { margin-bottom: 8px; }
+
+  .tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+    background: var(--ink); color: var(--plane); font-size: 12px; line-height: 1.45;
+    padding: 6px 9px; border-radius: 6px; z-index: 20; white-space: nowrap; }
+  .err { color: var(--critical); font-size: 14px; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; }
+  .colhead { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 6px 0; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 880px) { .cols { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Fork Yield</h1>
+      <p class="sub">What parallel exploration costs, and which forks ever pay for themselves.</p>
+    </div>
+    <div>
+      <button class="theme" id="theme">theme</button>
+      <div class="meta" id="meta"></div>
+    </div>
+  </header>
+
+  <div id="app"><p class="sub" style="margin-top:28px">loading…</p></div>
+
+  <footer>
+    Every figure here is checkable. <code>/api/sandboxes?beyond=true</code> returns the
+    forks behind the headline, and <code>?empty=true</code> the clean runs that produced nothing.
+  </footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const tip = document.getElementById('tip');
+function wireTips(svg) {
+  svg.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      tip.innerHTML = el.dataset.tip; tip.style.opacity = 1;
+      const pad = 14;
+      let x = e.clientX + pad, y = e.clientY - 34;
+      if (x + tip.offsetWidth > innerWidth - 8) x = e.clientX - tip.offsetWidth - pad;
+      if (y < 8) y = e.clientY + pad;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    });
+    el.addEventListener('mouseleave', () => tip.style.opacity = 0);
+  });
+}
+
+/* Ticks a person would pick: 0, 25, 50, 75 — not 0, 23, 46, 69. */
+function niceAxis(max, maxSteps = 4) {
+  if (!max || max <= 0) return [1, 1];
+  const raw = max / maxSteps;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+  return [Math.ceil(max / step) * step, step];
+}
+
+const pct  = v => v === null || v === undefined ? '—' : Math.round(v * 100) + '%';
+const pct1 = v => v === null || v === undefined ? '—' : (v * 100).toFixed(1) + '%';
+const usd  = v => v === null || v === undefined ? '—' :
+  (v >= 100 ? '$' + Math.round(v).toLocaleString() : '$' + v.toFixed(2));
+/* Ticks need one consistent shape down the whole scale, so no cents and no
+   switching format halfway up the axis. */
+const usdAxis = v => v >= 1 || v === 0 ? '$' + Math.round(v).toLocaleString()
+                                       : '$' + v.toFixed(2);
+const esc  = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const wk   = w => w.replace(/^\d{4}-W/, 'W');
+
+/* --------------------------------------------- columns with a cut marker */
+function columns(rows, opts = {}) {
+  const W = 880, H = opts.height || 250;
+  const m = { t: 14, r: 16, b: 42, l: 54 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const n = rows.length;
+  if (!n) return '<p class="sub">no data yet</p>';
+
+  const [axMax, step] = niceAxis(opts.max !== undefined ? opts.max : Math.max(...rows.map(r => r.value || 0)));
+  const bw = iw / n, pad = Math.min(10, bw * 0.22);
+  const X = i => m.l + i * bw;
+  const Y = v => m.t + ih - (v / axMax) * ih;
+
+  let g = '';
+  for (let v = 0; v <= axMax + 1e-9; v += step) {
+    g += `<line class="gl" x1="${m.l}" y1="${Y(v)}" x2="${m.l + iw}" y2="${Y(v)}"/>`;
+    g += `<text class="tick" x="${m.l - 8}" y="${Y(v) + 4}" text-anchor="end">${opts.fmtY ? opts.fmtY(v) : v}</text>`;
+  }
+
+  let bars = '', xs = '';
+  rows.forEach((r, i) => {
+    const h = r.value === null ? 0 : Math.max(1, (r.value / axMax) * ih);
+    const x = X(i) + pad / 2, w = bw - pad;
+    if (r.value === null) {
+      // unmeasured: a hatched stub, so the gap is visibly a gap rather
+      // than a zero somebody will read as "never wins"
+      bars += `<rect x="${x}" y="${m.t + ih - 6}" width="${w}" height="6" rx="1"
+        fill="var(--muted)" opacity="0.22" data-tip="${esc(r.tip || '')}"/>`;
+    } else {
+      bars += `<rect x="${x}" y="${Y(r.value)}" width="${w}" height="${h}" rx="2"
+        fill="${r.color || 'var(--series-1)'}" data-tip="${esc(r.tip || '')}"/>`;
+    }
+    xs += `<text class="tick" x="${X(i) + bw / 2}" y="${m.t + ih + 17}" text-anchor="middle">${esc(r.name)}</text>`;
+    if (r.sub) xs += `<text class="tick" x="${X(i) + bw / 2}" y="${m.t + ih + 31}" text-anchor="middle" opacity="0.75">${esc(r.sub)}</text>`;
+  });
+
+  // the vertical line marking "forks past here" — the whole point
+  let cut = '';
+  if (opts.cutAt !== undefined && opts.cutAt !== null && opts.cutAt < n) {
+    const cx = X(opts.cutAt);
+    cut = `<line x1="${cx}" y1="${m.t - 4}" x2="${cx}" y2="${m.t + ih}"
+      stroke="var(--series-2)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text class="dl" x="${cx + 7}" y="${m.t + 7}" fill="var(--series-2)">${esc(opts.cutLabel || '')}</text>`;
+  }
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria || '')}">
+    ${g}<line class="ax" x1="${m.l}" y1="${m.t + ih}" x2="${m.l + iw}" y2="${m.t + ih}"/>
+    ${bars}${cut}${xs}</svg>`;
+}
+
+/* ----------------------------------------------- horizontal bars */
+function barsH(rows, opts = {}) {
+  const rowH = 30, W = 880, m = { t: 6, r: 70, b: 22, l: opts.labelWidth || 150 };
+  const H = m.t + rows.length * rowH + m.b, iw = W - m.l - m.r;
+  const [axMax, step] = niceAxis(opts.max !== undefined ? opts.max : Math.max(...rows.map(r => r.value || 0)));
+
+  let g = '';
+  for (let v = 0; v <= axMax + 1e-9; v += step) {
+    const x = m.l + (v / axMax) * iw;
+    g += `<line class="gl" x1="${x}" y1="${m.t}" x2="${x}" y2="${m.t + rows.length * rowH}"/>`;
+    g += `<text class="tick" x="${x}" y="${H - 6}" text-anchor="middle">${opts.fmtX ? opts.fmtX(v) : v}</text>`;
+  }
+
+  let bars = '';
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH + 6, h = rowH - 14;
+    const w = ((r.value || 0) / axMax) * iw;
+    const gw = ((r.ghost || 0) / axMax) * iw;
+    if (r.ghost !== undefined)
+      bars += `<rect x="${m.l}" y="${y}" width="${gw}" height="${h}" rx="2" fill="var(--series-2)" opacity="0.2"/>`;
+    bars += `<rect x="${m.l}" y="${y}" width="${w}" height="${h}" rx="2"
+      fill="${r.color || opts.color || 'var(--series-1)'}" data-tip="${esc(r.tip || '')}"/>`;
+    bars += `<text class="lbl" x="${m.l - 10}" y="${y + h / 2 + 4}" text-anchor="end">${esc(r.name)}</text>`;
+    bars += `<text class="dl" x="${m.l + Math.max(w, gw) + 8}" y="${y + h / 2 + 4}" fill="var(--ink-2)">${esc(r.right || '')}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria || '')}">
+    ${g}<line class="ax" x1="${m.l}" y1="${m.t + rows.length * rowH}" x2="${m.l + iw}" y2="${m.t + rows.length * rowH}"/>${bars}</svg>`;
+}
+
+/* ----------------------------------------------- one stacked bar */
+function stack(parts, opts = {}) {
+  const W = 880, H = 76, m = { l: 0, r: 0, t: 10 };
+  const total = parts.reduce((a, p) => a + p.value, 0) || 1;
+  let x = 0, out = '', labels = '';
+  parts.forEach(p => {
+    const w = (p.value / total) * W;
+    out += `<rect x="${x}" y="${m.t}" width="${Math.max(0, w - 2)}" height="30" rx="3"
+      fill="${p.color}" data-tip="<b>${esc(p.name)}</b><br>${esc(p.detail || '')}"/>`;
+    if (w > 70) {
+      labels += `<text class="dl" x="${x + 6}" y="${m.t + 52}" fill="${p.color}">${esc(usd(p.value))}</text>`;
+      labels += `<text class="tick" x="${x + 6}" y="${m.t + 66}">${esc(p.name)}</text>`;
+    }
+    x += w;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria || '')}">${out}${labels}</svg>`;
+}
+
+function tableView(head, rows) {
+  return `<details class="tv"><summary>table view</summary><table>
+    <thead><tr>${head.map((h, i) => `<th class="${i ? 'num' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></details>`;
+}
+
+/* ------------------------------------------------------------- render */
+function render(m) {
+  const y = m.yield_curve, sp = m.spend, at = m.attribution, em = m.emptiness;
+
+  const tiles = `<div class="tiles">
+    <div class="tile">
+      <div class="k">Forks that catch ${pct(y.coverage_target)} of wins</div>
+      <div class="v">${y.recommended_forks ?? '—'}</div>
+      <div class="n">you average <strong>${y.mean_fork_count}</strong>, up to ${y.max_fork_count}</div>
+    </div>
+    <div class="tile">
+      <div class="k">Spent past that point</div>
+      <div class="v" style="color:var(--series-2)">${usd(y.beyond_cost)}</div>
+      <div class="n"><strong>${pct(y.beyond_share)}</strong> of compute, bought ${y.beyond_wins} ${y.beyond_wins === 1 ? 'win' : 'wins'}</div>
+    </div>
+    <div class="tile">
+      <div class="k">Awake and idle</div>
+      <div class="v">${usd(sp.idle)}</div>
+      <div class="n">${pct(sp.idle_share)} of the bill, and pause is free</div>
+    </div>
+    <div class="tile">
+      <div class="k">Clean exits, nothing produced</div>
+      <div class="v">${em.empty_count}</div>
+      <div class="n">${usd(em.empty_cost)}, ${pct(em.empty_share_of_clean)} of successful runs</div>
+    </div>
+  </div>`;
+
+  /* hero: win rate by fork index */
+  const cutAt = y.recommended_forks;
+  const heroRows = y.points.map(p => ({
+    name: String(p.fork_index),
+    sub: p.measured ? null : 'n/a',
+    value: p.win_rate,
+    color: (cutAt !== null && p.fork_index >= cutAt) ? 'var(--series-2)' : 'var(--series-1)',
+    tip: `<b>Fork ${p.fork_index}</b><br>${p.spawned} spawned, ${p.wins} won`
+       + `<br>${p.measured ? pct1(p.win_rate) + ' win rate' : 'too few to measure'}`
+       + `<br>${usd(p.cost)} spent`
+       + (p.cost_per_win !== null ? `<br>${usd(p.cost_per_win)} per win` : '<br>no wins'),
+  }));
+  const hero = `<section class="card">
+    <h2>Does fork number seven ever win</h2>
+    <p class="why">Each bar is one fork position: of the cohorts big enough to have a fork
+      there, how often that fork turned out to be the one you kept. Winners pile up at the
+      front. <em>${y.recommended_forks} forks would have caught ${pct(y.coverage_target)} of every win you got.</em>
+      The orange bars are the positions past that, and the grey stubs are indexes with fewer
+      than ${y.min_sample} cohorts behind them, which is too few to call either way.</p>
+    ${columns(heroRows, { fmtY: v => Math.round(v * 100) + '%',
+      cutAt: cutAt, cutLabel: `past here: ${usd(y.beyond_cost)} for ${y.beyond_wins} ${y.beyond_wins === 1 ? 'win' : 'wins'}`,
+      aria: 'Win rate by fork index' })}
+    ${tableView(['Fork', 'Spawned', 'Won', 'Win rate', 'Cost', 'Cost per win', 'Cumulative wins'],
+      y.points.map(p => [p.fork_index, p.spawned, p.wins,
+        p.measured ? pct1(p.win_rate) : '<span class="reason">n/a</span>',
+        usd(p.cost), p.cost_per_win === null ? '—' : usd(p.cost_per_win),
+        pct1(p.cumulative_win_share)]))}
+  </section>`;
+
+  /* cost per win by fork index — the decision number */
+  const cpw = y.points.filter(p => p.cost_per_win !== null);
+  const cpwCard = `<section class="card">
+    <h2>What one win costs at each fork position</h2>
+    <p class="why">The win rate says how often a position pays. This says what you paid for it.
+      A fork that wins once in a hundred tries is not cheap just because the machine was small.
+      <em>This is the number that should set a fork budget</em>, not a feeling about how wide to go.</p>
+    ${columns(cpw.map(p => ({
+      name: String(p.fork_index), value: p.cost_per_win,
+      color: (cutAt !== null && p.fork_index >= cutAt) ? 'var(--series-2)' : 'var(--series-1)',
+      tip: `<b>Fork ${p.fork_index}</b><br>${usd(p.cost)} spent for ${p.wins} ${p.wins === 1 ? 'win' : 'wins'}`
+         + `<br>${usd(p.cost_per_win)} each`,
+    })), { fmtY: usdAxis, height: 220, aria: 'Cost per win by fork index' })}
+  </section>`;
+
+  /* where the money went */
+  const spendCard = `<section class="card">
+    <h2>Where the money went</h2>
+    <p class="why">Discarded compute is not automatically waste, because discarding most of
+      what you spawn is the method. The split that matters is between losing forks at positions
+      that do sometimes win, and losing forks past the point where almost nothing ever has.
+      <em>Idle is counted separately</em>, since an idle hour already belongs to one of the
+      three bars above it, so these do not sum to the total.</p>
+    <div class="legend">
+      <span><i class="swatch box" style="background:var(--series-1)"></i>Won the task</span>
+      <span><i class="swatch box" style="background:var(--series-3)"></i>Exploration</span>
+      <span><i class="swatch box" style="background:var(--series-2)"></i>Long tail</span>
+    </div>
+    ${stack([
+      { name: 'Won the task', value: sp.winners, color: 'var(--series-1)',
+        detail: 'the forks you kept' },
+      { name: 'Exploration', value: sp.exploration, color: 'var(--series-3)',
+        detail: 'losing forks at positions that do win sometimes' },
+      { name: 'Long tail', value: sp.long_tail, color: 'var(--series-2)',
+        detail: `losing forks at fork ${cutAt} and beyond` },
+    ], { aria: 'Spend split by what it bought' })}
+    ${tableView(['', 'Amount', 'Share'], [
+      ['Total spend', usd(sp.total), '100%'],
+      ['Won the task', usd(sp.winners), pct1(sp.winner_share)],
+      ['Exploration', usd(sp.exploration), pct1(1 - (sp.winner_share || 0) - (sp.long_tail_share || 0))],
+      ['Long tail', usd(sp.long_tail), pct1(sp.long_tail_share)],
+      ['Awake and idle (overlaps)', usd(sp.idle), pct1(sp.idle_share)],
+      ['Cost per won task', usd(sp.cost_per_won_task), ''],
+      ['Running hours', sp.running_hours.toLocaleString(), ''],
+      ['Idle hours', sp.idle_hours.toLocaleString(), ''],
+    ])}
+  </section>`;
+
+  /* attribution */
+  const projRows = at.by_project.map(r => ({
+    name: r.name, value: r.cost, right: usd(r.cost),
+    tip: `<b>${esc(r.name)}</b><br>${r.sandboxes} sandboxes, ${r.won} wins`
+       + `<br>${usd(r.cost)} total, ${usd(r.idle_cost)} of it idle`
+       + (r.cost_per_win ? `<br>${usd(r.cost_per_win)} per win` : ''),
+  }));
+  const agentRows = at.by_agent.map(r => ({
+    name: r.name, value: r.cost_per_win || 0, right: usd(r.cost_per_win),
+    tip: `<b>${esc(r.name)}</b><br>${r.sandboxes} sandboxes, ${pct1(r.win_rate)} win rate`
+       + `<br>${usd(r.cost)} total<br>${r.empty} clean runs produced nothing`,
+  }));
+  const attrCard = `<section class="card">
+    <h2>Whose compute was it</h2>
+    <p class="why">The question every customer asks the first time the invoice grows, and the
+      one a per-call log cannot answer. Left is spend by project. Right is what a win costs
+      with each agent, which is the comparison that actually decides which one to use.</p>
+    <div class="cols">
+      <div>
+        <div class="colhead">Total spend by project</div>
+        ${barsH(projRows, { fmtX: usdAxis, labelWidth: 130, aria: 'Spend by project' })}
+      </div>
+      <div>
+        <div class="colhead">Cost per win by agent</div>
+        ${barsH(agentRows, { fmtX: usdAxis, labelWidth: 110, color: 'var(--series-3)',
+                             aria: 'Cost per win by agent' })}
+      </div>
+    </div>
+    ${tableView(['Agent', 'Sandboxes', 'Win rate', 'Spend', 'Idle', 'Empty', 'Cost per win'],
+      at.by_agent.map(r => [r.name, r.sandboxes, pct1(r.win_rate), usd(r.cost),
+                            usd(r.idle_cost), r.empty, usd(r.cost_per_win)]))}
+  </section>`;
+
+  /* empty runs */
+  const emptyRows = em.worst.slice(0, 10).map(r => `<tr>
+    <td>${esc(r.id)}</td>
+    <td>${esc(r.task_id)}</td>
+    <td><span class="pill">${esc(r.agent)}</span></td>
+    <td class="num">${r.fork_index}</td>
+    <td class="num">${r.hours}h</td>
+    <td class="num bad">${usd(r.cost)}</td>
+  </tr>`).join('');
+  const emptyCard = `<section class="card">
+    <h2>Ran clean, produced nothing</h2>
+    <p class="why">These exited zero. No crash, no error, nothing in the logs to find. From a
+      billing point of view they are identical to the runs that worked, because a machine was
+      awake for a while and then stopped. <em>Only an artifact check tells them apart</em>, and
+      ${em.empty_count} of ${em.exited_clean} successful runs did not produce one.</p>
+    <table>
+      <thead><tr><th>Sandbox</th><th>Task</th><th>Agent</th><th class="num">Fork</th>
+        <th class="num">Ran</th><th class="num">Cost</th></tr></thead>
+      <tbody>${emptyRows || '<tr><td colspan="6" class="reason">nothing empty</td></tr>'}</tbody>
+    </table>
+  </section>`;
+
+  /* trend */
+  const t = m.trend.points;
+  const trendCard = t.length ? `<section class="card">
+    <h2>Is any of this getting better</h2>
+    <p class="why">Cost per task that produced a keeper, week by week, bucketed by when the
+      cohort started. The current half-finished week is left off, because a week that is two
+      days old always looks like a cliff and someone always reads it as a win.</p>
+    ${columns(t.map(p => ({
+      name: wk(p.week), value: p.cost_per_won_task,
+      tip: `<b>${esc(wk(p.week))}</b><br>${p.cohorts} cohorts, ${p.sandboxes} sandboxes`
+         + `<br>${usd(p.cost)} spent, ${usd(p.cost_per_won_task)} per won task`
+         + `<br>mean ${p.mean_forks} forks`,
+    })), { fmtY: usdAxis, height: 220, aria: 'Cost per won task by week' })}
+    ${tableView(['Week', 'Cohorts', 'Sandboxes', 'Mean forks', 'Spend', 'Per won task', 'Idle'],
+      t.map(p => [wk(p.week), p.cohorts, p.sandboxes, p.mean_forks, usd(p.cost),
+                  usd(p.cost_per_won_task), usd(p.idle_cost)]))}
+  </section>` : '';
+
+  document.getElementById('app').innerHTML =
+    tiles + hero + cpwCard + spendCard + attrCard + emptyCard + trendCard;
+  document.querySelectorAll('svg').forEach(wireTips);
+  document.getElementById('meta').innerHTML =
+    `${m.sandbox_count.toLocaleString()} sandboxes · ${y.cohorts} settled cohorts · ${m.window_weeks} weeks`;
+}
+
+/* theme toggle, remembered per browser only. if storage is blocked this
+   silently does nothing, which is the correct amount of nothing. */
+(function theme() {
+  const btn = document.getElementById('theme');
+  let saved = null;
+  try { saved = localStorage.getItem('fy-theme'); } catch (e) {}
+  if (saved) document.documentElement.dataset.theme = saved;
+  btn.addEventListener('click', () => {
+    const dark = getComputedStyle(document.body).backgroundColor === 'rgb(13, 13, 13)';
+    const next = dark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('fy-theme', next); } catch (e) {}
+  });
+})();
+
+fetch('/api/metrics')
+  .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.detail || r.status); }))
+  .then(render)
+  .catch(e => {
+    document.getElementById('app').innerHTML =
+      `<section class="card"><p class="err">${esc(e.message)}</p></section>`;
+  });
+</script>
+</body>
+</html>
