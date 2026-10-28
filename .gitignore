@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/*.json
+.DS_Store
+.pytest_cache/
